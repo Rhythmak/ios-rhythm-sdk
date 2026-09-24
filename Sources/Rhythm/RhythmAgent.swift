@@ -1,4 +1,5 @@
 import Foundation
+
 /// Experimental adapter boundary. No network transport or wire protocol is shipped.
 /// Use one event consumer per transport and a new transport for each session.
 public protocol RhythmAgentTransport: Sendable {
@@ -8,31 +9,40 @@ public protocol RhythmAgentTransport: Sendable {
     func submit(result: RhythmTransactionResult) async throws
     func disconnect() async
 }
+
 public struct RhythmAgent: Sendable {
     public let network: RhythmNetwork
     private let transport: any RhythmAgentTransport
+
     internal init(network: RhythmNetwork, transport: any RhythmAgentTransport) {
         self.network = network
         self.transport = transport
     }
+
     public var events: AsyncStream<RhythmAgentEvent> { transport.events }
+
     public func connect() async throws {
         try await transport.connect(network: network)
     }
+
     public func send(text: String) async throws {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RhythmError.emptyMessage
         }
         try await transport.send(text: text)
     }
+
     public func submit(result: RhythmTransactionResult) async throws {
         try await transport.submit(result: result)
     }
+
     public func disconnect() async { await transport.disconnect() }
 }
+
 public struct RhythmAgentBuilder: Sendable {
     public static let shared = RhythmAgentBuilder()
     public init() {}
+
     /// Without an explicit adapter, connect/send/submit throw publicAPIUnavailable.
     public func build(
         network: RhythmNetwork,
@@ -41,6 +51,7 @@ public struct RhythmAgentBuilder: Sendable {
         RhythmAgent(network: network, transport: transport ?? UnavailableTransport())
     }
 }
+
 private struct UnavailableTransport: RhythmAgentTransport {
     let events = AsyncStream<RhythmAgentEvent> { $0.finish() }
     func connect(network: RhythmNetwork) async throws { throw RhythmError.publicAPIUnavailable }
